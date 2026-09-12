@@ -1,6 +1,9 @@
 # Dokument: CHANGELOG
-# Version: v1.7.1
+# Version: v1.7.2
 # Letzte Änderung: 2026-09-12
+
+## v1.7.2 - 2026-09-12
+- Start mit eng berechtigter Datenbankrolle: `init_db()` prüft das Schema in `pg_namespace` und legt es nur an, wenn es fehlt. Zuvor scheiterte `CREATE SCHEMA IF NOT EXISTS` ohne CREATE-Recht auf der Datenbank auch bei vorhandenem Schema (PostgreSQL prüft das Recht vor der Existenz).
 
 ## v1.7.1 - 2026-09-12
 - Repo-Pflege für die Veröffentlichung: tote Schema-Dublette `app/sql/invoice_schema.sql` entfernt (nicht referenziert, abweichender Tabellenname `invoice_number_seq`; maßgeblich ist `sql/001_invoice_core.sql`).

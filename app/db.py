@@ -50,9 +50,25 @@ async_session_factory = async_sessionmaker(
 
 
 async def init_db() -> None:
+    """Prueft das Schema, legt es nur an, wenn es fehlt.
+
+    PostgreSQL prueft bei ``CREATE SCHEMA IF NOT EXISTS`` das CREATE-Recht auf
+    der Datenbank *vor* der Existenzpruefung. Eine eng berechtigte Dienstrolle
+    (kein CREATE auf der Datenbank) scheiterte damit am Start, obwohl das Schema
+    laengst existiert. Deshalb: erst nachsehen, dann anlegen. Fehlt das Schema
+    und darf die Rolle nicht anlegen, scheitert der Start weiterhin laut.
+    """
     try:
         async with engine.begin() as conn:
-            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {_schema_quoted}"))
+            exists = await conn.scalar(
+                text("SELECT 1 FROM pg_namespace WHERE nspname = :s"),
+                {"s": settings.db_schema},
+            )
+            if exists:
+                logger.info("Schema %s vorhanden", settings.db_schema)
+            else:
+                logger.warning("Schema %s fehlt, wird angelegt", settings.db_schema)
+                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {_schema_quoted}"))
             await conn.execute(text(f"SET search_path TO {_schema_quoted}, public"))
     except Exception:
         logger.exception('Database initialization failed')
