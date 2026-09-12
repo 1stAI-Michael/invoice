@@ -1,29 +1,35 @@
 # Dokument: Dev
-# Version: v1.0
-# Letzte Änderung: 2025-02-06
+# Version: v1.1
+# Letzte Änderung: 2026-09-12
 
 ## Setup / Start
 ```bash
-docker compose up -d --build invoice-api openemr-sync
+cp .env.example .env        # DB_* eintragen
+docker compose up -d --build
 ```
 UI: http://localhost:8010/ui  
 Health: http://localhost:8010/health
 
-## ENV (aus /srv/Container/.env)
-- DB: `VIVO_DB_HOST`, `VIVO_DB_PORT`, `VIVO_DB_NAME`, `VIVO_DB_USER`, `VIVO_DB_PASSWORD`, `VIVO_DB_SSLMODE`, `VIVO_DB_SCHEMA` (Standard invoice).
-- OpenEMR Sync: `OPENEMR_DB_HOST`, `OPENEMR_DB_PORT`, `OPENEMR_DB_NAME`, `OPENEMR_DB_USER`, `OPENEMR_DB_PASSWORD`, `OPENEMR_SYNC_INTERVAL_SECONDS`, `OPENEMR_FULL_SYNC_ON_START`.
-- Misc: `TZ`, `INVOICE_API_PORT`.
+Das Repo enthält genau einen Dienst (`invoice-api`). Die PostgreSQL-Datenbank
+und der OpenEMR-Spiegel werden außerhalb betrieben (siehe README).
+
+## ENV (aus `.env`, gelesen von `app/settings.py`)
+- DB: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`, `DB_SCHEMA` (Standard `invoice`).
+  Der Code liest **nur** diese Namen; anders benannte Variablen (etwa mit Präfix) werden ignoriert
+  und der Dienst fällt still auf die Defaults zurück (`localhost`, `n8n`, `postgres`).
+- Migrationen: `RUN_SQL_MIGRATIONS=true` führt beim Start alle `sql/*.sql` aus (ohne Buchführung, idempotent).
+- Misc: `TZ`; nur Compose: `INVOICE_BIND`, `INVOICE_API_PORT`.
 - ZUGFeRD Felder: Provider IBAN/BIC, Services currency (char(3), Default EUR), Kunden Zahlungsbedingung Default SOFORT.
 - Stammdaten: `vat_category` (S/Z/E/AE/K), `invoice_type_code` (380/381/384/389); Provider/Kunde mit `vat_id`/`tax_id`.
 
 ## Logs / Debug
 - `docker compose logs -f invoice-api`
-- `docker compose logs -f openemr-sync`
 - Health: `curl http://localhost:8000/health` (im Container-Netz)
 
 ## DB-Schema
 - Schema `invoice`: customers, providers, services_master, service_entries, invoices, invoice_lines, invoice_diagnoses, payment_terms, invoice_number_sequences, triggers/Funktionen (invoice_finalize).
-- Schema `openemr`: patients, encounters, clinical_notes, problems (read-only Spiegel), gepflegt durch openemr-sync.
+  Maßgeblich sind ausschließlich die Dateien unter `sql/` (`001`–`015`).
+- Schema `openemr`: patients, encounters, clinical_notes, problems (read-only Spiegel), wird außerhalb dieses Repos gepflegt.
 
 ## ZUGFeRD / EN16931 Datenmodell
 - Mapping (CII):

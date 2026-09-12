@@ -15,7 +15,7 @@ PDF/ZUGFeRD-Engine, SQL-Migrationen, Dockerfile und ein Compose-Beispiel.
 |---|---|
 | `app/` | FastAPI-Anwendung: Routen (`routes_*.py`), UI (`routes_ui.py` + `templates/`), PDF (`pdf_renderer.py`), ZUGFeRD (`zugferd.py`, `zugferd_lite_validator.py`), DB (`db.py`, `settings.py`), Migrations-Runner (`sql_runner.py`) |
 | `sql/` | 15 Migrationen `001`–`015`, idempotent (IF NOT EXISTS, DO-Blöcke, `ON CONFLICT DO NOTHING`) |
-| `docs/` | API, UI, Workflow, Entwicklernotizen, Changelog |
+| `docs/` | API, Integration (Aufrufbeispiele), UI, Workflow, Entwicklernotizen, Changelog |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | Build und Betrieb |
 
 ## Voraussetzungen
@@ -104,7 +104,7 @@ Spiegels: `sql/003_openemr_read_model.sql`.
 * `GET /exports/invoices/{id}/pdf` · PDF mit eingebettetem ZUGFeRD-XML · `GET /exports/invoices/{id}/zugferd` · nur XML
 * HTMX-UI unter `/ui`
 
-Details: `docs/api.md`, `docs/workflow.md`, `docs/ui.md`, `docs/dev.md`, `docs/CHANGELOG.md`.
+Details: `docs/api.md`, `docs/integration.md` (vollständige Aufrufe), `docs/workflow.md`, `docs/ui.md`, `docs/dev.md`, `docs/CHANGELOG.md`.
 
 ## Entwicklung
 

@@ -1,6 +1,11 @@
 # Dokument: CHANGELOG
-# Version: v1.7
-# Letzte Änderung: 2026-01-13
+# Version: v1.7.1
+# Letzte Änderung: 2026-09-12
+
+## v1.7.1 - 2026-09-12
+- Repo-Pflege für die Veröffentlichung: tote Schema-Dublette `app/sql/invoice_schema.sql` entfernt (nicht referenziert, abweichender Tabellenname `invoice_number_seq`; maßgeblich ist `sql/001_invoice_core.sql`).
+- `docs/dev.md` auf den Stand des Codes gebracht (ENV-Namen `DB_*`, ein Dienst, kein Sync-Container im Repo).
+- Neu: `docs/integration.md` mit vollständigen Aufrufbeispielen für Kunden, Leistungskatalog und Leistungserfassung.
 
 ## v1.7 - 2026-01-13
 - PDF-/ZUGFeRD-Export behandelt Reverse-Charge (`AE`) ohne MwSt-Ausweis, ergänzt Zahlungsbedingungen im PDF/XML und synchronisiert `reverse_charge` beim Steuerkategorie-Wechsel.
