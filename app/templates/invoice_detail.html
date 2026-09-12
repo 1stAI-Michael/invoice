@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section">
+  <h2>
+    {% if invoice.cancellation_of_invoice_id %}Storno-Rechnung / Gutschrift{% else %}Invoice{% endif %} {{ invoice.id }}
+    {% if invoice.status == 'cancelled' %}<span class="badge">Storniert</span>{% endif %}
+  </h2>
+  <div>Status: {{ invoice.status }} {% if invoice.invoice_number %} · Nummer: {{ invoice.invoice_number }}{% endif %}</div>
+  {% if invoice.cancellation_of_invoice_id and credit_ref %}
+    <div>Bezug: Rechnung {{ credit_ref.invoice_number or credit_ref.id }}</div>
+  {% endif %}
+  {% if invoice.status == 'cancelled' and credit_child %}
+    <div>Gutschrift: <a href="/ui/invoice/{{ credit_child.id }}">Rechnung {{ credit_child.invoice_number or credit_child.id }}</a></div>
+  {% endif %}
+  <div>
+    Kunde: {{ invoice.customer_id }}{% if customer %} · {{ customer.firma or (customer.vorname ~ ' ' ~ customer.nachname) }}{% endif %}
+    · Provider: {{ invoice.provider_id }}{% if provider_code %} ({{ provider_code }}){% endif %}
+  </div>
+  {% if invoice.invoice_date %}<div>Datum: {{ invoice.invoice_date }}</div>{% endif %}
+  {% if invoice.invoice_type_code %}<div>Invoice Type: {{ invoice.invoice_type_code }}{% if invoice.invoice_type_meaning %} – {{ invoice.invoice_type_meaning }}{% endif %}</div>{% endif %}
+  {% include "_invoice_tax_block.html" %}
+  {% if provider_code == 'PP' and diagnoses and diagnoses|length > 0 %}
+    <div class="section card">
+      <h4>Diagnosen</h4>
+      <ul>
+        {% for d in diagnoses %}
+          <li>{{ d.icd_code }} – {{ d.title }}{% if d.begdate or d.enddate %} ({{ d.begdate }}{% if d.enddate %} – {{ d.enddate }}{% endif %}){% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  {% if provider and (provider.vat_id or provider.tax_id) %}
+    <div>Provider IDs:
+      {% if provider.vat_id %}USt-IdNr {{ provider.vat_id }}{% endif %}
+      {% if provider.tax_id %}{% if provider.vat_id %} · {% endif %}Steuernr {{ provider.tax_id }}{% endif %}
+    </div>
+  {% endif %}
+  {% if customer and (customer.vat_id or customer.tax_id) %}
+    <div>Kunde IDs:
+      {% if customer.vat_id %}USt-IdNr {{ customer.vat_id }}{% endif %}
+      {% if customer.tax_id %}{% if customer.vat_id %} · {% endif %}Steuernr {{ customer.tax_id }}{% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="section card">
+  <h3>Positionen</h3>
+  <table>
+    <thead><tr><th>#</th><th>Leistungsdatum</th><th>Service</th><th>Menge</th><th>Faktor</th><th>EP</th><th>GP</th></tr></thead>
+    <tbody>
+    {% for l in lines %}
+      <tr>
+        <td>{{ l.position_no }}</td>
+        <td>{{ l.leistungsdatum }}</td>
+        <td>{{ l.service_snapshot.get('nummer') }} – {{ l.service_snapshot.get('beschreibung') }}</td>
+        <td>{{ l.menge }}</td>
+        <td>{{ l.faktor }}</td>
+        <td>{{ l.einzelpreis }}</td>
+        <td>{{ l.gesamtpreis }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="section card">
+  <h3>Summen</h3>
+  {% if invoice.totals %}
+    <div>Netto: {{ invoice.totals.net }}</div>
+    <div>VAT: {{ invoice.totals.vat }}</div>
+    <div>Brutto: {{ invoice.totals.gross }}</div>
+  {% elif invoice.draft_totals is not none %}
+    <div>Draft-Summe (GP): {{ invoice.draft_totals }}</div>
+  {% else %}
+    <div class="muted">Totals noch nicht berechnet (Draft).</div>
+  {% endif %}
+</div>
+
+{% if invoice.status == 'draft' %}
+<form method="post" action="/ui/invoice/{{ invoice.id }}/finalize">
+  <button type="submit">Finalisieren</button>
+</form>
+<form method="post" action="/ui/invoice/{{ invoice.id }}/undo" style="margin-top:8px;">
+  <button type="submit">Entwurf verwerfen &amp; Leistungen wieder öffnen</button>
+</form>
+{% endif %}
+<div class="section">
+  <a class="btn" href="/exports/invoices/{{ invoice.id }}/pdf">PDF herunterladen</a>
+  {% if invoice.status == 'final' %}
+    <a class="btn" href="/exports/invoices/{{ invoice.id }}/zugferd">ZUGFeRD herunterladen</a>
+    <a class="btn" href="/exports/invoices/{{ invoice.id }}/zugferd/validate-lite">ZUGFeRD Lite Check</a>
+  {% endif %}
+</div>
+
+{% if invoice.status == 'final' and not invoice.cancellation_of_invoice_id %}
+<div class="section card">
+  <h3>Stornieren</h3>
+  <form method="post" action="/ui/invoice/{{ invoice.id }}/cancel">
+    <label>Storno-Grund:<br><input type="text" name="reason" required></label>
+    <button type="submit">Stornieren</button>
+  </form>
+</div>
+{% elif invoice.status == 'cancelled' %}
+<div class="section card">
+  <strong>Storniert.</strong>
+  {% if credit_child %}Gutschrift: <a href="/ui/invoice/{{ credit_child.id }}">{{ credit_child.invoice_number or credit_child.id }}</a>{% endif %}
+</div>
+{% endif %}
+
+{% if open_reopened and open_reopened|length > 0 %}
+<div class="section card">
+  <h3>Offene Leistungen (wieder freigegeben)</h3>
+  <table>
+    <thead><tr><th>Datum</th><th>Service</th><th>Kommentar</th><th>Menge</th><th>Faktor</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for e in open_reopened %}
+      <tr>
+        <td>{{ e.leistungsdatum }}</td>
+        <td>{{ e.nummer }} – {{ e.beschreibung }}</td>
+        <td>{{ e.kommentar or '' }}</td>
+        <td>{{ e.menge }}</td>
+        <td>{{ e.faktor }}</td>
+        <td>{{ e.status }}</td>
+        <td>
+          <form hx-post="/ui/service-entry/{{ e.id }}/delete" hx-target="closest tr" hx-swap="outerHTML">
+            <input type="hidden" name="pid" value="{{ invoice.customer_id }}">
+            <input type="hidden" name="provider_code" value="{{ provider_code if provider_code else '' }}">
+            <input type="hidden" name="encounter_id" value="{{ e.external_encounter_id }}">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="muted">Bearbeiten/Löschen hier; für Anpassungen sonst Patient-Ansicht nutzen.</div>
+</div>
+{% endif %}
+{% endblock %}

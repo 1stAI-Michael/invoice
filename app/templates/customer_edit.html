@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+</style>
+<div class="section card">
+  <h2>Customer bearbeiten</h2>
+  <form method="post">
+    <div class="form-row">
+      <label>Firma<br><input type="text" name="firma" value="{{ customer.firma or '' }}"></label>
+      <label>Vorname<br><input type="text" name="vorname" value="{{ customer.vorname or '' }}"></label>
+      <label>Nachname<br><input type="text" name="nachname" value="{{ customer.nachname or '' }}"></label>
+    </div>
+    <div class="form-row">
+      <label>Straße<br><input type="text" name="strasse" value="{{ customer.strasse or '' }}"></label>
+      <label>PLZ<br><input type="text" name="plz" value="{{ customer.plz or '' }}"></label>
+      <label>Ort<br><input type="text" name="ort" value="{{ customer.ort or '' }}"></label>
+      <label>Land<br><input type="text" name="land" value="{{ customer.land or '' }}"></label>
+    </div>
+    <div class="form-row">
+      <label>External System<br><input type="text" name="external_system" value="{{ customer.external_system or '' }}"></label>
+      <label>External ID<br><input type="text" name="external_id" value="{{ customer.external_id or '' }}"></label>
+    </div>
+    <div class="form-row">
+      <label>Tax ID<br><input type="text" name="tax_id" value="{{ customer.tax_id or '' }}"></label>
+      <label>VAT ID<br><input type="text" name="vat_id" value="{{ customer.vat_id or '' }}"></label>
+      <label>Zahlungsbedingung<br>
+        <select name="zahlungsbedingung_key">
+          {% set selected_payment_key = customer.zahlungsbedingung_key or 'SOFORT' %}
+          {% for term in payment_terms %}
+            <option value="{{ term.key }}" {% if term.key == selected_payment_key %}selected{% endif %}>{{ term.key }} - {{ term.text }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" name="reverse_charge" value="1" {% if customer.reverse_charge %}checked{% endif %}> Reverse Charge</label>
+    </div>
+    <button type="submit">Speichern</button>
+  </form>
+</div>
+{% endblock %}

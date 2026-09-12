@@ -1,0 +1,16 @@
+<div id="tax-block">
+  {% if invoice.status == 'draft' %}
+    <form hx-post="/ui/invoice/{{ invoice.id }}/set-tax" hx-target="#tax-block" hx-swap="outerHTML">
+      <label>Steuerkategorie:
+        <select name="rechnungs_code">
+          {% for vc in vat_categories %}
+            <option value="{{ vc.code }}" {% if invoice.rechnungs_code == vc.code %}selected{% endif %}>{{ vc.code }} – {{ vc.meaning }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Speichern</button>
+    </form>
+  {% else %}
+    <div>Steuerkategorie: {{ invoice.rechnungs_code }} {% if invoice.rechnungs_code_meaning %}– {{ invoice.rechnungs_code_meaning }}{% endif %}</div>
+  {% endif %}
+</div>

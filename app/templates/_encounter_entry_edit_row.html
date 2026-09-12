@@ -1,0 +1,25 @@
+<tr class="edit">
+  <td colspan="9">
+    <form hx-post="/ui/service-entry/{{ e.id }}/edit" hx-target="#enc-{{ encounter_id }}-entries" hx-swap="innerHTML">
+      <input type="hidden" name="encounter_id" value="{{ encounter_id }}">
+      <div class="muted">Service: {{ e.nummer }} – {{ e.beschreibung }}</div>
+      <label>Datum:
+        <input type="date" name="leistungsdatum" value="{{ e.leistungsdatum }}">
+      </label>
+      <label>Kommentar:
+        <textarea name="kommentar" class="comment-field" rows="1" style="width:24em;">{{ e.kommentar or '' }}</textarea>
+      </label>
+      <label>Menge:
+        <input type="text" inputmode="decimal" step="0.01" name="menge" value="{{ e.menge }}" style="width:6em;" oninput="this.value=this.value.trim().replace(',','.');">
+      </label>
+      <label>Faktor:
+        <input type="text" inputmode="decimal" step="0.01" name="faktor" value="{{ e.faktor }}" style="width:6em;" oninput="this.value=this.value.trim().replace(',','.');">
+      </label>
+      <button type="submit">SAVE</button>
+      <button type="button"
+              hx-get="/ui/service-entry/{{ e.id }}/row?encounter_id={{ encounter_id }}"
+              hx-target="closest tr"
+              hx-swap="outerHTML">CANCEL</button>
+    </form>
+  </td>
+</tr>

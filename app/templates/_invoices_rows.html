@@ -1,0 +1,22 @@
+{% if invoices %}
+  {% for i in invoices %}
+    {% set nr = i.invoice_number or ('DRAFT-' ~ i.id) %}
+    <tr>
+      <td>{{ i.invoice_date or '' }}</td>
+      <td><a href="/ui/invoice/{{ i.id }}">{{ nr }}</a></td>
+      <td>
+        {% if i.firma %}{{ i.firma }}{% endif %}
+        {% if i.vorname or i.nachname %}
+          {% if i.firma %}<br>{% endif %}{{ i.vorname }} {{ i.nachname }}
+        {% endif %}
+      </td>
+      <td>{{ i.provider_code }}</td>
+      <td>{{ '%.2f'|format(i.gross|default(0)) }}</td>
+      <td>{{ i.status }}</td>
+      <td>—</td>
+      <td><a href="/ui/invoice/{{ i.id }}">Öffnen</a></td>
+    </tr>
+  {% endfor %}
+{% else %}
+  <tr><td colspan="8" class="muted">Keine Rechnungen gefunden.</td></tr>
+{% endif %}

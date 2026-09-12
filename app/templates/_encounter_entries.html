@@ -1,0 +1,30 @@
+{% if entries %}
+  <table class="enc-entries">
+    <thead>
+      <tr><th>Datum</th><th>Service</th><th>Kommentar</th><th>Menge</th><th>Faktor</th><th>Betrag</th><th>Status</th><th>Rechnung</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+        {% include "_encounter_entry_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="section">
+    <strong>Summe Encounter:</strong> {{ '%.2f'|format(encounter_total|default(0)) }}
+    {% if day_totals %}
+      <table>
+        <thead><tr><th>Tag</th><th>Summe</th></tr></thead>
+        <tbody>
+          {% for d in day_totals %}
+            <tr>
+              <td>{{ d.date }}</td>
+              <td>{{ '%.2f'|format(d.total|default(0)) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="muted">Keine Leistungen zu diesem Encounter.</div>
+{% endif %}

@@ -1,0 +1,14 @@
+{% if customers %}
+  <ul>
+  {% for c in customers %}
+    <li>
+      <a href="/ui/customer/{{ c.id }}">{{ c.firma or (c.nachname ~ ', ' ~ c.vorname) or ('Kunde ' ~ c.id) }}</a>
+      {% if c.vat_id %}<span class="muted">VAT: {{ c.vat_id }}</span>{% endif %}
+      {% if c.tax_id %}<span class="muted">TAX: {{ c.tax_id }}</span>{% endif %}
+      {% if c.external_id %}<span class="muted">ext {{ c.external_id }}</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <div>Keine Kunden gefunden.</div>
+{% endif %}

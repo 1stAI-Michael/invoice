@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section">
+  <h2>Patientensuche</h2>
+  <form hx-get="/ui/search" hx-target="#results" hx-trigger="submit">
+    <input type="text" name="q" placeholder="Name oder PID" required>
+    <button type="submit">Suchen</button>
+  </form>
+  <div id="results" class="section"></div>
+</div>
+{% endblock %}

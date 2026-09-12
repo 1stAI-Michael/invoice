@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+</style>
+<div class="section card">
+  <h2>{% if is_new %}Leistung anlegen{% else %}Leistung bearbeiten (ID {{ svc.id }}){% endif %}</h2>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    <div class="form-row">
+      <label>Provider (PP/TI/MS)<br><input type="text" name="rechnungskuertzel" value="{{ svc.rechnungskuertzel }}"></label>
+      <label>Nummer<br><input type="text" name="nummer" value="{{ svc.nummer }}"></label>
+      <label>Beschreibung<br><input type="text" name="beschreibung" value="{{ svc.beschreibung }}"></label>
+    </div>
+    <div class="form-row">
+      <label>Standard Menge<br><input type="text" name="standard_menge" value="{{ svc.standard_menge }}" inputmode="decimal" step="0.01" oninput="this.value=this.value.trim().replace(',','.');"></label>
+      <label>Standard Faktor<br><input type="text" name="standard_faktor" value="{{ svc.standard_faktor }}" inputmode="decimal" step="0.01" oninput="this.value=this.value.trim().replace(',','.');"></label>
+      <label>Standard Einzelpreis<br><input type="text" name="standard_einzelpreis" value="{{ svc.standard_einzelpreis }}" inputmode="decimal" step="0.01" oninput="this.value=this.value.trim().replace(',','.');"></label>
+    </div>
+    <div class="form-row">
+      <label>MwSt Satz<br><input type="text" name="mwst_satz" value="{{ svc.mwst_satz }}" inputmode="decimal" step="0.01" oninput="this.value=this.value.trim().replace(',','.');"></label>
+      <label>Währung<br><input type="text" name="currency" value="{{ svc.currency }}"></label>
+      <label><input type="checkbox" name="requires_diagnosis" value="1" {% if svc.requires_diagnosis %}checked{% endif %}> Diagnosepflicht</label>
+    </div>
+    <div class="form-row">
+      <label>Kommentar Template<br><textarea name="kommentar_template" rows="3" cols="60">{{ svc.kommentar_template or '' }}</textarea></label>
+    </div>
+    <button type="submit">{% if is_new %}Anlegen{% else %}Speichern{% endif %}</button>
+    <a class="btn" href="/ui/services-master">Zurück</a>
+  </form>
+</div>
+{% endblock %}

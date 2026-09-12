@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section">
+  <h2>{{ patient.lname }}, {{ patient.fname }} (PID {{ patient.pid }})</h2>
+  <div class="muted">
+    {% if patient.dob %}DOB: {{ patient.dob }}{% endif %}
+    {% if patient.city %} · {{ patient.city }}{% endif %}
+    {% if patient.country_code %} · {{ patient.country_code }}{% endif %}
+  </div>
+</div>
+
+<div class="section card">
+  <h3>Aktive Diagnosen</h3>
+  {% if diagnoses %}
+    <ul>
+    {% for d in diagnoses %}
+      <li>{{ d.title }} {% if d.diagnosis %} ({{ d.diagnosis }}){% endif %} {% if d.begdate %}<span class="muted">seit {{ d.begdate }}</span>{% endif %}</li>
+    {% endfor %}
+    </ul>
+  {% else %}
+    <div class="muted">Keine aktiven Diagnosen.</div>
+  {% endif %}
+</div>
+
+<div class="section card">
+  <h3>Encounters & Notizen</h3>
+  {% for e in encounters %}
+    <div class="card">
+      <strong>{{ e.encounter_datetime.strftime('%Y-%m-%d %H:%M') if e.encounter_datetime else '' }}</strong> — {{ e.reason or 'Ohne Grundangabe' }}
+      {% if notes_by_enc.get(e.id) %}
+        <details>
+          <summary>Clinical Notes</summary>
+          <ul>
+            {% for n in notes_by_enc.get(e.id) %}
+              <li>{{ n.note_datetime }}: {{ n.codetext }} — {{ n.description }}</li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+      {% set note_text = note_text_by_date.get(e.encounter_date) %}
+      {% if note_text %}
+        <textarea class="note-box" rows="5" readonly>{{ note_text }}</textarea>
+      {% endif %}
+      {% set first_service = services[0] if services else None %}
+      <form hx-post="/ui/patient/{{ patient.pid }}/service-entry" hx-target="#enc-{{ e.id }}-entries" hx-swap="innerHTML" class="section">
+        <label>Provider:
+          <select name="provider_code">
+            <option value="PP" {% if provider_code=='PP' %}selected{% endif %}>PP</option>
+            <option value="TI" {% if provider_code=='TI' %}selected{% endif %}>TI</option>
+            <option value="MS" {% if provider_code=='MS' %}selected{% endif %}>MS</option>
+          </select>
+        </label>
+        {% if ziffernkette_options %}
+        <label>Ziffernkette:
+          <select name="ziffernkette_kuerzel"
+                  hx-post="/ui/patient/{{ patient.pid }}/ziffernkette"
+                  hx-trigger="change"
+                  hx-target="#enc-{{ e.id }}-entries"
+                  hx-swap="innerHTML"
+                  hx-include="closest form"
+                  hx-on::after-request="this.selectedIndex=0;">
+            <option value="">Bitte wahlen</option>
+            {% for z in ziffernkette_options %}
+              <option value="{{ z.kuerzel }}">{{ z.kuerzel }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        <label>Service:
+          <select name="service_id" class="service-select" onchange="updateServiceFields(this)">
+            {% for s in services %}
+              <option value="{{ s.id }}" data-factor="{{ s.standard_faktor }}" data-comment="{{ s.kommentar_template|default('', true) }}">{{ s.nummer }} – {{ s.beschreibung }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Leistungsdatum: <input type="date" name="leistungsdatum" value="{{ e.encounter_date }}"></label>
+        <label>Kommentar:
+          <textarea name="kommentar" class="comment-field" rows="1" style="width:24em;"></textarea>
+        </label>
+        <label>Menge: <input type="text" inputmode="decimal" step="0.01" name="menge" value="1.00" style="width:6em;" oninput="this.value=this.value.trim().replace(',','.');"></label>
+        <label>Faktor: <input type="text" inputmode="decimal" step="0.01" name="faktor" value="{{ first_service.standard_faktor if first_service else '1.00' }}" style="width:6em;" oninput="this.value=this.value.trim().replace(',','.');"></label>
+        <input type="hidden" name="external_encounter_id" value="{{ e.id }}">
+        <button type="submit">ADD</button>
+      </form>
+      <div id="enc-{{ e.id }}-entries" class="section">
+        {% set entries = (encounter_entries.get(e.id, []) + encounter_entries.get(None, [])) if encounter_entries else [] %}
+        {% set encounter_id = e.id %}
+        {% set pid = patient.pid %}
+        {% set day_totals = encounter_day_totals.get(encounter_id, []) %}
+        {% set encounter_total = encounter_totals.get(encounter_id, 0) %}
+        {% include "_encounter_entries.html" %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="section card">
+  <div style="display:flex; justify-content: space-between; align-items: center;">
+    <h3>Offene Leistungen (Provider {{ provider_code }})</h3>
+    <form method="post" action="/ui/patient/{{ patient.pid }}/create-invoice">
+      <input type="hidden" name="provider_code" value="{{ provider_code }}">
+      <button type="submit">Rechnung aus offenen Leistungen erstellen</button>
+    </form>
+  </div>
+  <div id="open-entries">
+    {% include "_open_entries.html" %}
+  </div>
+  <div class="section">
+    <h4>Entwürfe (Draft) für Provider {{ provider_code }}</h4>
+    {% if draft_invoices %}
+      <table>
+        <thead><tr><th>ID</th><th>Erstellt</th><th>Total</th><th></th></tr></thead>
+        <tbody>
+        {% for d in draft_invoices %}
+          <tr>
+            <td>{{ d.id }}</td>
+            <td>{{ d.created_at }}</td>
+            <td>{{ d.total }}</td>
+            <td><a href="/ui/invoice/{{ d.id }}">Öffnen</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="muted">Keine Draft-Rechnungen.</div>
+    {% endif %}
+  </div>
+</div>
+<script>
+  function updateServiceFields(selectEl) {
+    if (!selectEl) return;
+    const form = selectEl.closest('form');
+    const selected = selectEl.options[selectEl.selectedIndex];
+    const factor = selected ? selected.getAttribute('data-factor') : null;
+    const comment = selected ? selected.getAttribute('data-comment') : null;
+    const faktorInput = form ? form.querySelector('input[name="faktor"]') : null;
+    const commentInput = form ? form.querySelector('[name="kommentar"]') : null;
+    if (faktorInput && factor) {
+      faktorInput.value = factor;
+    }
+    if (commentInput) {
+      const autoFlag = commentInput.dataset.auto || '';
+      if (comment && (commentInput.value.trim() === '' || autoFlag === '1')) {
+        commentInput.value = comment;
+        commentInput.dataset.auto = '1';
+      }
+    }
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.service-select').forEach(sel => {
+      const form = sel.closest('form');
+      const commentInput = form ? form.querySelector('[name="kommentar"]') : null;
+      if (commentInput) {
+        commentInput.addEventListener('input', () => { commentInput.dataset.auto = '0'; });
+      }
+      sel.addEventListener('change', () => updateServiceFields(sel));
+      updateServiceFields(sel);
+    });
+  });
+  document.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (!target || !target.classList || !target.classList.contains('comment-field')) return;
+    if (event.key !== 'Enter') return;
+    if (event.shiftKey) return;
+    const form = target.closest('form');
+    if (!form) return;
+    event.preventDefault();
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+  });
+</script>
+{% endblock %}

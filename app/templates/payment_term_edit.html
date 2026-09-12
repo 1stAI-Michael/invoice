@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+</style>
+<div class="section card">
+  <h2>{% if is_new %}Zahlungsbedingung anlegen{% else %}Zahlungsbedingung bearbeiten ({{ term.key }}){% endif %}</h2>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    <div class="form-row">
+      {% if is_new %}
+        <label>Key<br><input type="text" name="key" value="{{ term.key }}"></label>
+      {% else %}
+        <label>Key<br><input type="text" value="{{ term.key }}" disabled></label>
+      {% endif %}
+      <label>Text<br><input type="text" name="text" value="{{ term.text }}" size="50"></label>
+    </div>
+    <button type="submit">{% if is_new %}Anlegen{% else %}Speichern{% endif %}</button>
+    <a class="btn" href="/ui/payment-terms">Zurück</a>
+  </form>
+</div>
+{% endblock %}

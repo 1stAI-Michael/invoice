@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section card">
+  <h2>Provider bearbeiten</h2>
+  <form method="post">
+    <label>Firma: <input type="text" name="firma" value="{{ provider.firma or '' }}"></label><br>
+    <label>Vorname: <input type="text" name="vorname" value="{{ provider.vorname or '' }}"></label><br>
+    <label>Nachname: <input type="text" name="nachname" value="{{ provider.nachname or '' }}"></label><br>
+    <label>IBAN: <input type="text" name="iban" value="{{ provider.iban or '' }}"></label><br>
+    <label>BIC: <input type="text" name="bic" value="{{ provider.bic or '' }}"></label><br>
+    <label>Tax ID: <input type="text" name="tax_id" value="{{ provider.tax_id or '' }}"></label><br>
+    <label>VAT ID: <input type="text" name="vat_id" value="{{ provider.vat_id or '' }}"></label><br>
+    <label>Freitext1: <input type="text" name="freitext1" value="{{ provider.freitext1 or '' }}"></label><br>
+    <label>Freitext2: <input type="text" name="freitext2" value="{{ provider.freitext2 or '' }}"></label><br>
+    <button type="submit">Speichern</button>
+  </form>
+</div>
+{% endblock %}

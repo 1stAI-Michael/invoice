@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section card">
+  <h2>Rechnungsübersicht</h2>
+  <form method="get" action="/ui/invoices" class="filters">
+    <label>Suche: <input type="text" name="q" value="{{ q }}"></label>
+    <label>Provider:
+      <select name="provider_code">
+        <option value="">Alle</option>
+        <option value="PP" {% if provider_code=='PP' %}selected{% endif %}>PP</option>
+        <option value="TI" {% if provider_code=='TI' %}selected{% endif %}>TI</option>
+        <option value="MS" {% if provider_code=='MS' %}selected{% endif %}>MS</option>
+      </select>
+    </label>
+    <label>Status:
+      <select name="status">
+        <option value="">Alle</option>
+        <option value="draft" {% if status=='draft' %}selected{% endif %}>draft</option>
+        <option value="final" {% if status=='final' %}selected{% endif %}>final</option>
+        <option value="cancelled" {% if status=='cancelled' %}selected{% endif %}>cancelled</option>
+      </select>
+    </label>
+    <label>Von: <input type="date" name="date_from" value="{{ date_from }}"></label>
+    <label>Bis: <input type="date" name="date_to" value="{{ date_to }}"></label>
+    <button type="submit">Filtern</button>
+  </form>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Rechnungsnr.</th>
+        <th>Kunde</th>
+        <th>Provider</th>
+        <th>Brutto</th>
+        <th>Status</th>
+        <th>Bezahlt</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% include "_invoices_rows.html" %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

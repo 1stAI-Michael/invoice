@@ -1,0 +1,33 @@
+{% set all_scope = all_scope if all_scope is defined else False %}
+{% if entries %}
+  <table class="enc-entries">
+    <thead>
+      <tr>
+        {% if all_scope %}<th>Provider</th>{% endif %}
+        <th>Datum</th><th>Service</th><th>Kommentar</th><th>Menge</th><th>Faktor</th><th>Status</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in entries %}
+      <tr>
+        {% if all_scope %}<td>{{ e.provider_code or '' }}</td>{% endif %}
+        <td>{{ e.leistungsdatum }}</td>
+        <td>{{ e.nummer or '(ohne Service)' }} {% if e.beschreibung %}– {{ e.beschreibung }}{% endif %}</td>
+        <td>{{ e.kommentar or '' }}</td>
+        <td>{{ e.menge }}</td>
+        <td>{{ e.faktor }}</td>
+        <td>{{ e.status }}</td>
+        <td>
+          <form hx-post="/ui/service-entry/{{ e.id }}/delete" hx-target="#open-entries" hx-swap="innerHTML">
+            <input type="hidden" name="customer_view" value="1">
+            <input type="hidden" name="provider_code" value="{{ provider_code }}">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <div class="muted">Keine offenen Leistungen.</div>
+{% endif %}

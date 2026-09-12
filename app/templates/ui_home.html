@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section card">
+  <h2>OpenEMR Patientensuche</h2>
+  <form hx-get="/ui/search-openemr" hx-target="#openemr-results" hx-trigger="keyup changed delay:300ms">
+    <input type="text" name="q" placeholder="Name oder PID suchen" value="{{ q or '' }}">
+  </form>
+  <div id="openemr-results" class="results">
+    {% if patients is not none %}
+      {% include "_openemr_results.html" %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="section card">
+  <h2>Invoice Kunden</h2>
+  <form hx-get="/ui/search-customers" hx-target="#customer-results" hx-trigger="keyup changed delay:300ms">
+    <input type="text" name="q" placeholder="Firma, Name, VAT/TAX, externe ID" value="{{ q or '' }}">
+  </form>
+  <div id="customer-results" class="results">
+    {% if customers is not none %}
+      {% include "_customer_results.html" %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="section">
+  <a class="btn" href="/ui/invoices">Rechnungsübersicht</a>
+  <a class="btn" href="/ui/customers">Kundenübersicht</a>
+  <a class="btn" href="/ui/services-master">Leistungskatalog</a>
+  <a class="btn" href="/ui/payment-terms">Zahlungsbedingungen</a>
+</div>
+{% endblock %}

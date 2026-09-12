@@ -1,0 +1,13 @@
+{% if patients %}
+  <ul>
+  {% for p in patients %}
+    <li>
+      <a href="/ui/patient/{{ p.pid }}">{{ p.lname }}, {{ p.fname }} (PID {{ p.pid }})</a>
+      {% if p.dob %}<span class="muted">DOB: {{ p.dob }}</span>{% endif %}
+      {% if p.city %}<span class="muted">/ {{ p.city }}</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <div>Keine Ergebnisse.</div>
+{% endif %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+</style>
+<div class="section card">
+  <h2>Neuen Kunden anlegen</h2>
+  <form method="post">
+    <div class="form-row">
+      <label>Firma<br><input type="text" name="firma"></label>
+      <label>Vorname<br><input type="text" name="vorname"></label>
+      <label>Nachname<br><input type="text" name="nachname"></label>
+    </div>
+    <div class="form-row">
+      <label>Straße<br><input type="text" name="strasse"></label>
+      <label>PLZ<br><input type="text" name="plz"></label>
+      <label>Ort<br><input type="text" name="ort"></label>
+      <label>Land<br><input type="text" name="land"></label>
+    </div>
+    <div class="form-row">
+      <label>External System<br><input type="text" name="external_system"></label>
+      <label>External ID<br><input type="text" name="external_id"></label>
+    </div>
+    <div class="form-row">
+      <label>TAX ID<br><input type="text" name="tax_id"></label>
+      <label>VAT ID<br><input type="text" name="vat_id"></label>
+      <label>Zahlungsbedingung<br>
+        <select name="zahlungsbedingung_key">
+          {% for term in payment_terms %}
+            <option value="{{ term.key }}" {% if term.key == 'SOFORT' %}selected{% endif %}>{{ term.key }} - {{ term.text }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-row">
+      <label><input type="checkbox" name="reverse_charge" value="1"> Reverse Charge</label>
+    </div>
+    <button type="submit">Speichern</button>
+  </form>
+</div>
+{% endblock %}

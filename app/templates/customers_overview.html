@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+.form-actions { display: flex; align-items: flex-end; gap: 8px; }
+</style>
+<div class="section card">
+  <h2>Kundenübersicht</h2>
+  <form method="get" class="filter-form">
+    <div class="form-row">
+      <label>Firma<br><input type="text" name="firma" value="{{ firma }}"></label>
+      <label>Nachname<br><input type="text" name="nachname" value="{{ nachname }}"></label>
+      <label>Ort<br><input type="text" name="ort" value="{{ ort }}"></label>
+      <div class="form-actions"><button type="submit">Filtern</button></div>
+    </div>
+  </form>
+  <div class="form-actions" style="margin-top:8px;">
+    <a class="btn" href="/ui/customers/new">Neuen Kunden anlegen</a>
+  </div>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Firma / Name</th>
+        <th>Adresse</th>
+        <th>VAT/TAX</th>
+        <th>Externe ID</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in customers %}
+      <tr>
+        <td>{{ c.id }}</td>
+        <td>
+          {{ c.firma or '' }}{% if c.firma and (c.vorname or c.nachname) %}<br>{% endif %}
+          {{ c.vorname }} {{ c.nachname }}
+        </td>
+        <td>
+          {{ c.strasse or '' }}{% if c.strasse %}<br>{% endif %}
+          {{ c.plz or '' }} {{ c.ort or '' }}{% if c.land %}<br>{{ c.land }}{% endif %}
+        </td>
+        <td>
+          {% if c.vat_id %}VAT: {{ c.vat_id }}<br>{% endif %}
+          {% if c.tax_id %}TAX: {{ c.tax_id }}{% endif %}
+        </td>
+        <td>{{ c.external_id or '' }}</td>
+        <td>
+          <a class="btn" href="/ui/customer/{{ c.id }}">Öffnen</a>
+          <a class="btn" href="/ui/customer/{{ c.id }}/edit">Bearbeiten</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">Keine Kunden gefunden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

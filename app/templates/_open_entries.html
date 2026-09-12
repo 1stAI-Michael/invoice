@@ -1,0 +1,25 @@
+<div id="open-entries">
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+{% if open_entries %}
+  <table>
+    <thead>
+      <tr><th>Datum</th><th>Service</th><th>Menge</th><th>Faktor</th><th>Kommentar</th></tr>
+    </thead>
+      <tbody>
+      {% for e in open_entries %}
+        <tr>
+          <td>{{ e.leistungsdatum }}</td>
+          <td>{{ e.nummer }} – {{ e.beschreibung }}{% if e.kommentar %}<br><span class="muted">{{ e.kommentar }}</span>{% endif %}</td>
+          <td>{{ e.menge }}</td>
+          <td>{{ e.faktor }}</td>
+          <td>{{ e.kommentar }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <div class="muted">Keine offenen Leistungen.</div>
+{% endif %}
+</div>

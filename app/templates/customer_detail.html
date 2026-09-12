@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section card">
+  <h2>Kunde {{ customer.id }}{% if customer.firma %} · {{ customer.firma }}{% endif %}</h2>
+  <div>{{ customer.vorname }} {{ customer.nachname }}</div>
+  <div>{{ customer.strasse }}</div>
+  <div>{{ customer.plz }} {{ customer.ort }} {% if customer.land %}({{ customer.land }}){% endif %}</div>
+  <div>
+    {% if customer.vat_id %}USt-IdNr: {{ customer.vat_id }}{% endif %}
+    {% if customer.tax_id %}{% if customer.vat_id %} · {% endif %}Steuernr: {{ customer.tax_id }}{% endif %}
+  </div>
+  <div>Zahlungsbedingung: {{ customer.zahlungsbedingung_key or 'SOFORT' }}</div>
+  <div>Reverse Charge: {{ 'ja' if customer.reverse_charge else 'nein' }}</div>
+</div>
+
+<div class="section card">
+  <form method="get" action="/ui/customer/{{ customer.id }}">
+    <label>Provider:
+      <select name="provider_code" onchange="this.form.submit()">
+        <option value="TI" {% if provider_code=='TI' %}selected{% endif %}>TI</option>
+        <option value="PP" {% if provider_code=='PP' %}selected{% endif %}>PP</option>
+        <option value="MS" {% if provider_code=='MS' %}selected{% endif %}>MS</option>
+      </select>
+    </label>
+  </form>
+
+  <h3>Leistung erfassen</h3>
+  <form hx-post="/ui/customer/{{ customer.id }}/service-entry"
+        hx-target="#open-entries"
+        hx-swap="innerHTML">
+    <input type="hidden" name="provider_code" value="{{ provider_code }}">
+    <label>Datum: <input type="date" name="leistungsdatum" value="{{ today }}"></label>
+    <label>Service:
+      <select name="service_id">
+        {% for s in services %}
+          <option value="{{ s.id }}">{{ s.nummer }} – {{ s.beschreibung }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Menge: <input type="text" name="menge" value="1.00" inputmode="decimal" oninput="this.value=this.value.trim().replace(',','.');"></label>
+    <label>Faktor: <input type="text" name="faktor" value="1.00" inputmode="decimal" oninput="this.value=this.value.trim().replace(',','.');"></label>
+    <label>Kommentar: <input type="text" name="kommentar"></label>
+    <button type="submit">Leistung hinzufügen</button>
+  </form>
+</div>
+
+<div class="section card">
+  <h3>Offene Leistungen</h3>
+  <div id="open-entries">
+    {% with entries=open_entries, provider_code=provider_code, all_scope=False %}
+      {% include "_open_entries_customer.html" %}
+    {% endwith %}
+  </div>
+  <form method="post" action="/ui/customer/{{ customer.id }}/create-invoice">
+    <input type="hidden" name="provider_code" value="{{ provider_code }}">
+    <button type="submit">Rechnung aus offenen Leistungen erstellen</button>
+  </form>
+</div>
+
+{% if all_open_entries is defined and all_open_entries and all_open_entries|length > 0 %}
+<div class="section card">
+  <h3>Alle offenen Leistungen (alle Provider)</h3>
+  <div id="open-entries-all">
+    {% with entries=all_open_entries, provider_code='*', all_scope=True %}
+      {% include "_open_entries_customer.html" %}
+    {% endwith %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

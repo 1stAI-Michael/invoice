@@ -1,0 +1,198 @@
+-- Prepare ZUGFeRD-related fields and defaults
+SET search_path TO invoice, public;
+
+-- 1) Providers: IBAN/BIC
+ALTER TABLE invoice.providers
+    ADD COLUMN IF NOT EXISTS iban text,
+    ADD COLUMN IF NOT EXISTS bic text;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_providers_iban_len'
+    ) THEN
+        ALTER TABLE invoice.providers
+            ADD CONSTRAINT ck_providers_iban_len CHECK (iban IS NULL OR length(btrim(iban)) BETWEEN 15 AND 34);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_providers_bic_len'
+    ) THEN
+        ALTER TABLE invoice.providers
+            ADD CONSTRAINT ck_providers_bic_len CHECK (bic IS NULL OR length(btrim(bic)) IN (8,11));
+    END IF;
+END;
+$$;
+
+-- 2) Services: currency
+ALTER TABLE invoice.services_master
+    ADD COLUMN IF NOT EXISTS currency char(3) NOT NULL DEFAULT 'EUR';
+UPDATE invoice.services_master
+SET currency = 'EUR'
+WHERE currency IS NULL OR btrim(currency) = '';
+
+-- 3) Payment terms: ensure SOFORT exists
+INSERT INTO invoice.payment_terms(key, text)
+VALUES ('SOFORT', 'Zahlbar sofort ohne Abzug')
+ON CONFLICT (key) DO NOTHING;
+
+-- 4) Customers: default payment terms SOFORT + backfill
+ALTER TABLE invoice.customers
+    ALTER COLUMN zahlungsbedingung_key SET DEFAULT 'SOFORT';
+UPDATE invoice.customers
+SET zahlungsbedingung_key = 'SOFORT'
+WHERE zahlungsbedingung_key IS NULL OR btrim(zahlungsbedingung_key) = '';
+
+-- 5) Provider snapshot: add IBAN/BIC to finalize snapshot
+CREATE OR REPLACE FUNCTION invoice.invoice_finalize(p_invoice_id bigint)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    inv record;
+    prov record;
+    cust record;
+    payment_text text;
+    lines_json jsonb;
+    totals_json jsonb;
+    net_total numeric(18,2) := 0;
+    vat_total numeric(18,2) := 0;
+    gross_total numeric(18,2) := 0;
+    line record;
+BEGIN
+    SELECT * INTO inv FROM invoice.invoices WHERE id = p_invoice_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invoice % not found', p_invoice_id;
+    END IF;
+    IF inv.status <> 'draft' THEN
+        RAISE EXCEPTION 'Invoice % must be draft to finalize (current=%)', p_invoice_id, inv.status;
+    END IF;
+
+    SELECT * INTO cust FROM invoice.customers WHERE id = inv.customer_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Customer % not found for invoice %', inv.customer_id, p_invoice_id;
+    END IF;
+    SELECT * INTO prov FROM invoice.providers WHERE id = inv.provider_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider % not found for invoice %', inv.provider_id, p_invoice_id;
+    END IF;
+
+    inv.invoice_date := COALESCE(inv.invoice_date, CURRENT_DATE);
+    inv.reverse_charge := COALESCE(inv.reverse_charge, cust.reverse_charge);
+
+    SELECT text INTO payment_text
+    FROM invoice.payment_terms
+    WHERE key = cust.zahlungsbedingung_key;
+
+    -- snapshots
+    inv.customer_snapshot := jsonb_build_object(
+        'id', cust.id,
+        'external_system', cust.external_system,
+        'external_id', cust.external_id,
+        'firma', cust.firma,
+        'vorname', cust.vorname,
+        'nachname', cust.nachname,
+        'strasse', cust.strasse,
+        'plz', cust.plz,
+        'ort', cust.ort,
+        'land', cust.land,
+        'zahlungsbedingung_key', cust.zahlungsbedingung_key,
+        'reverse_charge', cust.reverse_charge
+    );
+
+    inv.provider_snapshot := jsonb_build_object(
+        'id', prov.id,
+        'code', prov.code,
+        'firma', prov.firma,
+        'vorname', prov.vorname,
+        'nachname', prov.nachname,
+        'strasse', prov.strasse,
+        'plz', prov.plz,
+        'ort', prov.ort,
+        'land', prov.land,
+        'email', prov.email,
+        'telefon', prov.telefon,
+        'website', prov.website,
+        'freitext1', prov.freitext1,
+        'freitext2', prov.freitext2,
+        'iban', prov.iban,
+        'bic', prov.bic
+    );
+
+    inv.payment_terms_text := payment_text;
+
+    -- leistungsdatum_max
+    SELECT max(leistungsdatum) INTO inv.leistungsdatum_max
+    FROM invoice.invoice_lines WHERE invoice_id = inv.id;
+
+    -- assign invoice number if missing
+    IF inv.invoice_number IS NULL THEN
+        inv.invoice_number := invoice.invoice_next_number(prov.code, inv.invoice_date);
+    END IF;
+
+    -- totals and line json aggregation
+    SELECT COALESCE(jsonb_agg(
+        jsonb_build_object(
+            'id', id,
+            'position_no', position_no,
+            'leistungsdatum', leistungsdatum,
+            'menge', menge,
+            'faktor', faktor,
+            'mwst_satz', mwst_satz,
+            'einzelpreis', einzelpreis,
+            'gesamtpreis', gesamtpreis,
+            'service_snapshot', service_snapshot
+        ) ORDER BY position_no, id
+    ), '[]'::jsonb)
+    INTO lines_json
+    FROM invoice.invoice_lines
+    WHERE invoice_id = inv.id;
+
+    -- compute totals
+    FOR line IN
+        SELECT mwst_satz, gesamtpreis FROM invoice.invoice_lines WHERE invoice_id = inv.id
+    LOOP
+        net_total := net_total + line.gesamtpreis;
+        IF NOT inv.reverse_charge THEN
+            vat_total := vat_total + (line.gesamtpreis * line.mwst_satz / 100);
+        END IF;
+    END LOOP;
+    gross_total := net_total + vat_total;
+
+    totals_json := jsonb_build_object(
+        'net', COALESCE(net_total, 0),
+        'vat', COALESCE(vat_total, 0),
+        'gross', COALESCE(gross_total, 0)
+    );
+
+    -- hash header + lines
+    inv.hash := encode(
+        digest(
+            (jsonb_build_object(
+                'invoice', to_jsonb(inv) - 'hash',
+                'lines', lines_json
+            ))::text,
+            'sha256'
+        ),
+        'hex'
+    );
+
+    UPDATE invoice.invoices
+    SET invoice_number     = inv.invoice_number,
+        invoice_date       = inv.invoice_date,
+        leistungsdatum_max = inv.leistungsdatum_max,
+        reverse_charge     = inv.reverse_charge,
+        customer_snapshot  = inv.customer_snapshot,
+        provider_snapshot  = inv.provider_snapshot,
+        payment_terms_text = inv.payment_terms_text,
+        totals             = totals_json,
+        hash               = inv.hash,
+        status             = 'final',
+        finalized_at       = now()
+    WHERE id = inv.id;
+END;
+$$;
+
+-- Checks (manual)
+-- SELECT iban, bic FROM invoice.providers LIMIT 5;
+-- SELECT currency, count(*) FROM invoice.services_master GROUP BY currency;
+-- SELECT zahlungsbedingung_key, count(*) FROM invoice.customers GROUP BY zahlungsbedingung_key;

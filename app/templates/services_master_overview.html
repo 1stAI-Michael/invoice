@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; }
+.form-actions { display: flex; align-items: flex-end; gap: 8px; }
+table th, table td { vertical-align: top; }
+</style>
+<div class="section card">
+  <h2>Leistungskatalog (services_master)</h2>
+  <form method="get" class="filter-form">
+    <div class="form-row">
+      <label>Provider (PP/TI/MS)<br><input type="text" name="provider_code" value="{{ provider_code }}"></label>
+      <label>Nummer<br><input type="text" name="nummer" value="{{ nummer }}"></label>
+      <label>Beschreibung<br><input type="text" name="beschreibung" value="{{ beschreibung }}"></label>
+      <div class="form-actions">
+        <button type="submit">Filtern</button>
+        <a class="btn" href="/ui/services-master/new">Neue Leistung</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Provider</th>
+        <th>Nummer</th>
+        <th>Beschreibung</th>
+        <th>Standard</th>
+        <th>Preis</th>
+        <th>MwSt</th>
+        <th>Diagnosepflicht</th>
+        <th>Währung</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in services %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ s.rechnungskuertzel }}</td>
+        <td>{{ s.nummer }}</td>
+        <td>{{ s.beschreibung }}</td>
+        <td>Menge {{ s.standard_menge }}<br>Faktor {{ s.standard_faktor }}</td>
+        <td>{{ s.standard_einzelpreis }}</td>
+        <td>{{ s.mwst_satz }}</td>
+        <td>{{ 'ja' if s.requires_diagnosis else 'nein' }}</td>
+        <td>{{ s.currency or 'EUR' }}</td>
+        <td><a class="btn" href="/ui/services-master/{{ s.id }}/edit">Bearbeiten</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10">Keine Leistungen gefunden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

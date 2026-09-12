@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+table th, table td { vertical-align: top; }
+</style>
+<div class="section card">
+  <h2>Zahlungsbedingungen</h2>
+  <a class="btn" href="/ui/payment-terms/new">Neue Zahlungsbedingung</a>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Text</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for term in payment_terms %}
+      <tr>
+        <td>{{ term.key }}</td>
+        <td>{{ term.text }}</td>
+        <td><a class="btn" href="/ui/payment-terms/{{ term.key }}/edit">Bearbeiten</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">Keine Zahlungsbedingungen gefunden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
