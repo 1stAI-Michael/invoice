@@ -67,3 +67,34 @@ curl -X POST http://localhost:8000/workflow/invoices/draft-from-service-entries 
   -H 'Content-Type: application/json' \
   -d '{"provider_code":"PP","openemr_pid":123}'
 ```
+
+
+## Agenten-Schnittstelle (v1.8.0, fA-2245)
+
+Damit legen Schienen offene Leistungen an, ohne Schreibzugang auf die Datenbank. Es geht nur das, nichts weiter.
+
+    POST /api/invoice/service-entries/device      Scope invoice:write
+    GET  /api/invoice/service-entries/device?customer_id=123&provider_code=MS   Scope invoice:read
+    Authorization: Bearer <Geraete-Token der Schiene>
+
+Rumpf beim Anlegen (ein Kunde und ein Provider je Stapel, höchstens 500 Positionen):
+
+```json
+{
+  "customer_id": 123, "provider_code": "MS",
+  "erwartet_anzahl": 2, "erwartet_summe": "150.00",
+  "probe": false,
+  "positionen": [
+    {"service_nummer": "AUSL", "leistungsdatum": "2026-03-02", "menge": "48.90", "faktor": "1.00", "kommentar": "Beispiel"}
+  ]
+}
+```
+
+- **Einzelpreis und Status setzt der Server:** Einzelpreis aus `services_master.standard_einzelpreis`, Status `open`. Die Summe ist `menge × faktor × standard_einzelpreis`.
+- **Idempotenz:** Geprüft wird der Schlüssel (Kunde, Provider, Leistung, Leistungsdatum, Menge, Faktor, Kommentar) gegen `open` und `invoiced`, als Multimenge gezählt. Derselbe Stapel ein zweites Mal ergibt 0 angelegt und alles übersprungen. Zwei gleiche Positionen in einem Stapel ergeben zwei Einträge.
+- **Wächter:** Weichen `erwartet_*` vom offenen Stand ab, antwortet die Route mit 409 `ausgangsstand_weicht_ab` und dem Ist-Stand und legt nichts an. Gibt es nichts anzulegen, wird der Wächter nicht angewandt (`waechter: nicht_angewandt_nichts_anzulegen`).
+- **Alles oder nichts:** Der Stapel läuft in einer Transaktion mit einer Sperre je (Kunde, Provider). Die Antwort trägt `vorher`, `nachher` und je Position `angelegt` bzw. `uebersprungen` mit `id`.
+- **Probelauf:** Mit `"probe": true` wird alles geprüft und geplant, auch der Wächter, aber nichts geschrieben. Die Antwort nennt `wuerde_angelegt` und `nachher_erwartet`.
+- **Fehler:** 401 ohne Token. 403 bei ungültigem Token oder `scope_required`. 404 bei unbekanntem Kunden oder Provider. 422 `leistung_unbekannt` mit Index. 503, wenn flows-api das Token nicht beurteilen konnte.
+- **Nicht enthalten:** Rechnung erstellen, Festschreiben, Löschen, Ändern, Kunden- oder Provider-Anlage.
+- **Herkunft:** Das Log nennt `device_name` und die angelegten ids (`docker logs invoice-api`, rotiert). Eine Spalte „angelegt von“ gibt es noch nicht, dafür bräuchte es eine Migration auf CT107.

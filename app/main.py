@@ -14,6 +14,7 @@ from app.routes_workflow import router as workflow_router
 from app.routes_ui import router as ui_router
 from app.routes_exports import router as exports_router
 from app.routes_customers import router as customers_router
+from app.routes_device import router as device_router  # fA-2245: Agenten, Geraete-Token
 
 
 logger = logging.getLogger(__name__)
@@ -50,3 +51,4 @@ app.include_router(workflow_router)
 app.include_router(ui_router)
 app.include_router(exports_router)
 app.include_router(customers_router)
+app.include_router(device_router)

@@ -1,6 +1,12 @@
 # Dokument: CHANGELOG
-# Version: v1.7.2
-# Letzte Änderung: 2026-09-12
+# Version: v1.8.0
+# Letzte Änderung: 2026-11-25
+
+## v1.8.0 - 2026-11-25
+- Neu (fA-2245): Agenten-Schnittstelle `POST/GET /api/invoice/service-entries/device` mit Geräte-Token (Scopes `invoice:write` / `invoice:read`). Sie legt nur offene Leistungen für einen Kunden und Provider an. Rechnung, Löschen, Ändern sowie Kunden- und Provider-Anlage sind nicht möglich. Siehe `docs/api.md`.
+- Ob das Token gilt, prüft flows-api über seine Selbstauskunft (`INVOICE_TOKEN_CHECK_URL`), nicht die invoice-api. Ohne Antwort von dort schließt die Route mit 503.
+- Idempotenz über den fachlichen Schlüssel, als Multimenge gezählt. Wächter `erwartet_anzahl`/`erwartet_summe`, alles oder nichts, Gegenprobe in der Antwort.
+- Tests: `tests/test_device_entries.py` (läuft im Container in einer zurückgerollten Transaktion).
 
 ## v1.7.2 - 2026-09-12
 - Start mit eng berechtigter Datenbankrolle: `init_db()` prüft das Schema in `pg_namespace` und legt es nur an, wenn es fehlt. Zuvor scheiterte `CREATE SCHEMA IF NOT EXISTS` ohne CREATE-Recht auf der Datenbank auch bei vorhandenem Schema (PostgreSQL prüft das Recht vor der Existenz).
