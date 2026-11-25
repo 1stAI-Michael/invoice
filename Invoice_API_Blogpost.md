@@ -108,7 +108,7 @@ Providers (TI, PP, MS)
             │
             ├── Invoice Lines (Positionen mit Snapshot)
             ├── Invoice Diagnoses (ICD-Codes, nur PP)
-            └── Number Sequences (TI2600001, PP2600002...)
+            └── Number Sequences (TI2600099, PP2600098...)
 ```
 
 ---
