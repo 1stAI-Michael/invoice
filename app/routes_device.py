@@ -296,3 +296,96 @@ async def offene_leistungen(
             for r in rows
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# v2 (fA-2245, Michael 25.11.2026: "API v2: Aendern erlauben")
+# ---------------------------------------------------------------------------
+# Anlass: einzelne angelegte Positionen trugen ein falsches Belegdatum aus dem OCR.
+# Bewusst eng wie v1:
+#   * nur `leistungsdatum` und `kommentar`, nur bei status 'open'
+#   * der Aufrufer nennt Kunde und Provider (ein Tippfehler in der id trifft sonst einen
+#     fremden Posten) UND den Wert, den er ersetzt (`vorher`): weicht der Stand ab, 409
+#     und nichts geaendert -- dieselbe Idee wie der Waechter beim Anlegen
+#   * Menge, Faktor, Leistung, Kunde, Status bleiben unveraenderlich; kein Loeschen
+
+class Aenderung(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    customer_id: int
+    provider_code: str = Field(..., pattern="^(TI|PP|MS)$")
+    vorher: dict[str, Optional[str]] = Field(..., description="aktuelle Werte der geaenderten Felder")
+    leistungsdatum: Optional[date] = None
+    kommentar: Optional[str] = Field(None, max_length=2000)
+    kommentar_leeren: bool = False
+
+
+async def aendern(session: AsyncSession, entry_id: int, a: Aenderung, geraet_name: str) -> tuple[int, dict[str, Any]]:
+    felder: dict[str, Any] = {}
+    if a.leistungsdatum is not None:
+        felder["leistungsdatum"] = a.leistungsdatum
+    if a.kommentar is not None and a.kommentar_leeren:
+        return 422, {"error": "widerspruch", "detail": "kommentar und kommentar_leeren schliessen sich aus"}
+    if a.kommentar is not None:
+        felder["kommentar"] = a.kommentar
+    if a.kommentar_leeren:
+        felder["kommentar"] = None
+    if not felder:
+        return 422, {"error": "nichts_zu_aendern", "detail": "leistungsdatum und/oder kommentar angeben"}
+    fehlend = [f for f in felder if f not in a.vorher]
+    if fehlend:
+        return 422, {"error": "vorher_fehlt", "felder": fehlend,
+                     "detail": "fuer jedes geaenderte Feld den aktuellen Wert in `vorher` nennen"}
+
+    provider_id = await _provider_id(session, a.provider_code)
+    row = await fetch_one(
+        session,
+        """
+        SELECT id, customer_id, provider_id, status, leistungsdatum, kommentar
+          FROM invoice.service_entries WHERE id = :id FOR UPDATE
+        """,
+        {"id": entry_id},
+    )
+    if not row or row["customer_id"] != a.customer_id or row["provider_id"] != provider_id:
+        # Gleiche Antwort fuer "gibt es nicht" und "gehoert nicht zu diesem Kunden":
+        # die Route verraet keine fremden Posten.
+        return 404, {"error": "posten_unbekannt", "id": entry_id}
+    if row["status"] != "open":
+        return 409, {"error": "nicht_offen", "id": entry_id, "status": row["status"]}
+
+    ist = {"leistungsdatum": row["leistungsdatum"].isoformat(), "kommentar": row["kommentar"]}
+    abw = [f for f in felder if (a.vorher.get(f) or None) != (ist[f] or None)]
+    if abw:
+        return 409, {"error": "vorher_weicht_ab", "abweichung": abw, "ist": ist, "geaendert": False}
+
+    neu = {**ist, **{k: (v.isoformat() if isinstance(v, date) else v) for k, v in felder.items()}}
+    if neu == ist:
+        return 200, {"id": entry_id, "geaendert": False, "vorher": ist, "nachher": ist, "geraet": geraet_name}
+
+    sets = ", ".join(f"{k} = :{k}" for k in felder)
+    await execute(session, f"UPDATE invoice.service_entries SET {sets} WHERE id = :id AND status = 'open'",
+                  {**felder, "id": entry_id})
+    nachher_row = await fetch_one(
+        session, "SELECT leistungsdatum, kommentar FROM invoice.service_entries WHERE id = :id", {"id": entry_id})
+    nachher = {"leistungsdatum": nachher_row["leistungsdatum"].isoformat(), "kommentar": nachher_row["kommentar"]}
+    logger.info("fA-2245 v2 Aenderung: geraet=%s id=%s kunde=%s felder=%s vorher=%s nachher=%s",
+                geraet_name, entry_id, a.customer_id, sorted(felder), ist, nachher)
+    return 200, {"id": entry_id, "geaendert": True, "vorher": ist, "nachher": nachher, "geraet": geraet_name}
+
+
+@router.patch("/{entry_id}")
+async def leistung_aendern(
+    entry_id: int,
+    a: Aenderung,
+    geraet: Geraet = Depends(braucht_scope("invoice:write")),
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        status, antwort = await aendern(session, entry_id, a, geraet.device_name)
+    except Exception:
+        await session.rollback()
+        raise
+    if status != 200:
+        await session.rollback()
+        return JSONResponse(status_code=status, content=antwort)
+    await session.commit()
+    return antwort

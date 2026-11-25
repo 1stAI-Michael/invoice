@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from app import device_auth
 from app.db import async_session_factory
 from app.db_utils import fetch_one
-from app.routes_device import Stapel, anlegen
+from app.routes_device import Aenderung, Stapel, aendern, anlegen
 
 FEHLER = []
 
@@ -85,6 +85,27 @@ async def db_teil():
                 pruefe(False, "unbekannter Kunde: haette 404 sein muessen")
             except HTTPException as e:
                 pruefe(e.status_code == 404, f"unbekannter Kunde: 404, kein Anlegen -> {e.status_code}")
+            # ---- v2: Aendern ----
+            r = await fetch_one(s, "SELECT id FROM invoice.service_entries WHERE customer_id=:c AND kommentar='Test A'", {"c": cid})
+            eid = int(r["id"])
+            def A(**kw): return Aenderung(customer_id=kw.pop("customer_id", cid), provider_code="MS", **kw)
+            st, a = await aendern(s, eid, A(vorher={"leistungsdatum": "2026-01-05"}, leistungsdatum="2026-08-05"), "test")
+            pruefe(st == 200 and a["geaendert"] and a["nachher"]["leistungsdatum"] == "2026-08-05", f"v2 Datum geaendert -> {st} {a.get('nachher')}")
+            st, a = await aendern(s, eid, A(vorher={"leistungsdatum": "2026-08-05"}, leistungsdatum="2026-08-05"), "test")
+            pruefe(st == 200 and a["geaendert"] is False, f"v2 Wiederholung: geaendert=False -> {st} {a.get('geaendert')}")
+            st, a = await aendern(s, eid, A(vorher={"leistungsdatum": "2026-01-05"}, leistungsdatum="2026-09-01"), "test")
+            pruefe(st == 409 and a["error"] == "vorher_weicht_ab" and a["ist"]["leistungsdatum"] == "2026-08-05", f"v2 veraltetes vorher: 409 mit Ist -> {st} {a.get('ist')}")
+            st, a = await aendern(s, eid, A(vorher={}, leistungsdatum="2026-09-01"), "test")
+            pruefe(st == 422 and a["error"] == "vorher_fehlt", f"v2 ohne vorher: 422 -> {st}")
+            st, a = await aendern(s, eid, A(customer_id=-1, vorher={"leistungsdatum": "2026-08-05"}, leistungsdatum="2026-09-01"), "test")
+            pruefe(st == 404, f"v2 falscher Kunde: 404 -> {st}")
+            st, a = await aendern(s, eid, A(vorher={"kommentar": "Test A"}, kommentar_leeren=True), "test")
+            pruefe(st == 200 and a["nachher"]["kommentar"] is None, f"v2 Kommentar leeren -> {a.get('nachher')}")
+            await fetch_one(s, "UPDATE invoice.service_entries SET status='invoiced' WHERE id=:i RETURNING id", {"i": eid})
+            st, a = await aendern(s, eid, A(vorher={"leistungsdatum": "2026-08-05"}, leistungsdatum="2026-09-01"), "test")
+            pruefe(st == 409 and a["error"] == "nicht_offen", f"v2 abgerechneter Posten: 409 nicht_offen -> {st}")
+            r = await fetch_one(s, "SELECT leistungsdatum FROM invoice.service_entries WHERE id=:i", {"i": eid})
+            pruefe(str(r["leistungsdatum"]) == "2026-08-05", "v2 nach 409/422/404 steht der Wert unveraendert")
         finally:
             await s.rollback()
     async with async_session_factory() as s:

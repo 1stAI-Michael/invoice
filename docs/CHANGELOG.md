@@ -1,6 +1,9 @@
 # Dokument: CHANGELOG
-# Version: v1.8.0
+# Version: v1.9.0
 # Letzte Änderung: 2026-11-25
+
+## v1.9.0 - 2026-11-25
+- Neu (v2 der Agenten-Schnittstelle): `PATCH /api/invoice/service-entries/device/{id}` (Scope `invoice:write`). Ändert nur `leistungsdatum` und/oder `kommentar` eines **offenen** Postens. Der Aufrufer nennt Kunde, Provider und in `vorher` den Wert, den er ersetzt. Weicht der Stand ab, gibt es 409 `vorher_weicht_ab` mit Ist und keine Änderung. Ein fremder oder unbekannter Posten ergibt 404, ein abgerechneter 409 `nicht_offen`. Kein Löschen.
 
 ## v1.8.0 - 2026-11-25
 - Neu (fA-2245): Agenten-Schnittstelle `POST/GET /api/invoice/service-entries/device` mit Geräte-Token (Scopes `invoice:write` / `invoice:read`). Sie legt nur offene Leistungen für einen Kunden und Provider an. Rechnung, Löschen, Ändern sowie Kunden- und Provider-Anlage sind nicht möglich. Siehe `docs/api.md`.

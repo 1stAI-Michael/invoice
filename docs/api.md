@@ -98,3 +98,18 @@ Rumpf beim Anlegen (ein Kunde und ein Provider je Stapel, höchstens 500 Positio
 - **Fehler:** 401 ohne Token. 403 bei ungültigem Token oder `scope_required`. 404 bei unbekanntem Kunden oder Provider. 422 `leistung_unbekannt` mit Index. 503, wenn flows-api das Token nicht beurteilen konnte.
 - **Nicht enthalten:** Rechnung erstellen, Festschreiben, Löschen, Ändern, Kunden- oder Provider-Anlage.
 - **Herkunft:** Das Log nennt `device_name` und die angelegten ids (`docker logs invoice-api`, rotiert). Eine Spalte „angelegt von“ gibt es noch nicht, dafür bräuchte es eine Migration auf CT107.
+
+### Ändern (v1.9.0)
+
+    PATCH /api/invoice/service-entries/device/{id}      Scope invoice:write
+
+```json
+{"customer_id": 123, "provider_code": "MS",
+ "vorher": {"leistungsdatum": "2021-08-05"},
+ "leistungsdatum": "2026-08-05"}
+```
+
+- Änderbar sind nur `leistungsdatum` und `kommentar` (oder `kommentar_leeren: true`), und nur bei Posten mit Status `open`. Menge, Faktor, Leistung, Kunde und Status bleiben, wie sie sind.
+- **`vorher` ist Pflicht** für jedes geänderte Feld. Weicht der gespeicherte Wert ab, kommt 409 `vorher_weicht_ab` mit `ist`, und es wird nichts geändert.
+- Passen Kunde oder Provider nicht zur id, kommt 404, die Antwort sagt nichts über fremde Posten. Ein abgerechneter Posten ergibt 409 `nicht_offen`.
+- Ist der Zielwert schon gesetzt, kommt 200 mit `geaendert: false`. Die Antwort trägt `vorher`, `nachher` und `geraet`, das Log den Gerätenamen.
