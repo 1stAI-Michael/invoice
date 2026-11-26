@@ -69,6 +69,16 @@ curl -X POST http://localhost:8000/workflow/invoices/draft-from-service-entries 
 ```
 
 
+## Schreibrechte (v1.10.0, fA-2302)
+
+- **Lesen** (`GET`) ist auf allen Routen unverändert.
+- **Schreiben** (`POST`/`PUT`/`PATCH`/`DELETE`) auf den alten Routen (`/service-entries`, `/invoices`, `/customers`, `/ui`, `/exports`, `/workflow`, `/openemr`, Services) geht nur noch
+  - über die Web-UI hinter dem Anmelde-Proxy. Erkannt wird sie an der TCP-Quelle aus `INVOICE_UI_QUELLEN`. Ist die Variable leer, gibt es keine Ausnahme.
+  - oder mit einem Geräte-Token mit `invoice:write` (`Authorization: Bearer …`).
+- Ohne Ausweis: `401 schreiben_ohne_ausweis`. Mit Token ohne Scope: `403 scope_required`. Beides kommt **vor** der Feldprüfung, ein ungültiger Rumpf ergibt also kein 422.
+- Einen Platzhalter-Scope `*` gibt es nicht mehr. Jeder Scope muss namentlich am Gerät stehen.
+- **Zwischenspeicher:** Ein positives Prüfergebnis von flows-api wird 60 s gemerkt (`INVOICE_TOKEN_CACHE_SECONDS`). Ein entwerteter Ausweis kann deshalb bis zu 60 s weiter schreiben. „Entwertet“ heißt also nicht „sofort dicht“.
+
 ## Agenten-Schnittstelle (v1.8.0, fA-2245)
 
 Damit legen Schienen offene Leistungen an, ohne Schreibzugang auf die Datenbank. Es geht nur das, nichts weiter.

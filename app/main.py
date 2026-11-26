@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -15,6 +15,7 @@ from app.routes_ui import router as ui_router
 from app.routes_exports import router as exports_router
 from app.routes_customers import router as customers_router
 from app.routes_device import router as device_router  # fA-2245: Agenten, Geraete-Token
+from app.device_auth import schreib_riegel  # fA-2302
 
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,15 @@ async def health() -> dict[str, str]:
         raise HTTPException(status_code=500, detail='health check failed')
 
 
-app.include_router(invoices_router)
-app.include_router(openemr_router)
-app.include_router(service_entries_router)
-app.include_router(services_router)
-app.include_router(workflow_router)
-app.include_router(ui_router)
-app.include_router(exports_router)
-app.include_router(customers_router)
+# fA-2302: alle ALTEN Router schreiben nur noch ueber die Web-UI (Anmeldung) oder mit invoice:write.
+# Der Geraete-Router prueft selbst (braucht_scope) und bekommt den Riegel NICHT doppelt.
+_riegel = [Depends(schreib_riegel)]
+app.include_router(invoices_router, dependencies=_riegel)
+app.include_router(openemr_router, dependencies=_riegel)
+app.include_router(service_entries_router, dependencies=_riegel)
+app.include_router(services_router, dependencies=_riegel)
+app.include_router(workflow_router, dependencies=_riegel)
+app.include_router(ui_router, dependencies=_riegel)
+app.include_router(exports_router, dependencies=_riegel)
+app.include_router(customers_router, dependencies=_riegel)
 app.include_router(device_router)

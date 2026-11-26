@@ -112,7 +112,9 @@ async def pruefe_token(token: str) -> Geraet:
 
 
 def _hat_scope(scopes: list[str], noetig: str) -> bool:
-    return "*" in scopes or noetig in scopes
+    # fA-2302 Punkt 4: KEIN Platzhalter "*". Ein Geraet mit "*" bekaeme invoice:write sonst lautlos
+    # mit (gemessen 26.11.: 0 von 98 Geraeten tragen "*", der Zweig war latent).
+    return noetig in scopes
 
 
 def braucht_scope(noetig: str):
@@ -138,3 +140,42 @@ def braucht_scope(noetig: str):
 
 def cache_leeren() -> None:
     _cache.clear()
+
+
+
+# ---------------------------------------------------------------------------
+# fA-2302: Schreibriegel fuer die ALTEN Routen. Vorher nahmen sie ohne Ausweis an; Grenze war nur
+# das Netz. Jetzt schreibt dort nur:
+#   * die Web-UI hinter dem Anmelde-Proxy -- erkannt an der TCP-Quelle (INVOICE_UI_QUELLEN, kommagetrennt).
+#     Das traegt nur, solange der Proxy alle Pfade ausser dem Geraete-Pfad durch die Anmeldung fuehrt.
+#   * oder ein Geraete-Token mit invoice:write.
+# Ohne INVOICE_UI_QUELLEN gibt es keine Ausnahme (geschlossen). Lesen bleibt unveraendert.
+# Als Router-Abhaengigkeit (nicht Middleware), damit sie NACH dem Routing greift und keine
+# Pfad-Schreibweise an ihr vorbeifuehrt.
+# ---------------------------------------------------------------------------
+UI_QUELLEN = {a.strip() for a in os.environ.get("INVOICE_UI_QUELLEN", "").split(",") if a.strip()}
+SCHREIBEND = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+async def schreib_riegel(request: Request) -> None:
+    if request.method not in SCHREIBEND:
+        return
+    quelle = request.client.host if request.client else ""
+    if quelle in UI_QUELLEN:
+        return
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer ") or not auth[7:].strip():
+        logger.warning("Schreibversuch ohne Ausweis abgewiesen: %s %s von %s", request.method, request.url.path, quelle)
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "schreiben_ohne_ausweis",
+                    "detail": "Schreiben nur ueber die Web-UI (Anmeldung) oder mit Geraete-Token invoice:write."},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    geraet = await pruefe_token(auth[7:].strip())
+    if not _hat_scope(geraet.scopes, "invoice:write"):
+        raise HTTPException(status_code=403, detail={
+            "error": "scope_required", "missing": ["invoice:write"], "have": geraet.scopes,
+        })
+    logger.info("alter Schreibweg mit Token: %s %s von %s (%s)", request.method, request.url.path,
+                geraet.device_name, quelle)
