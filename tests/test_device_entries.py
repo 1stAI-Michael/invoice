@@ -106,6 +106,14 @@ async def db_teil():
             pruefe(st == 409 and a["error"] == "nicht_offen", f"v2 abgerechneter Posten: 409 nicht_offen -> {st}")
             r = await fetch_one(s, "SELECT leistungsdatum FROM invoice.service_entries WHERE id=:i", {"i": eid})
             pruefe(str(r["leistungsdatum"]) == "2026-08-05", "v2 nach 409/422/404 steht der Wert unveraendert")
+            # ---- fA-2302 Punkt 3: angelegt_von + Spur ----
+            r = await fetch_one(s, "SELECT count(*) AS n, count(*) FILTER (WHERE angelegt_von = 'test') AS t "
+                                   "FROM invoice.service_entries WHERE customer_id=:c", {"c": cid})
+            pruefe(r["n"] > 0 and r["n"] == r["t"], f"angelegt_von: alle {r['n']} Zeilen tragen das Geraet -> {r['t']}")
+            r = await fetch_one(s, "SELECT string_agg(feld || ':' || coalesce(vorher,'-') || '>' || coalesce(nachher,'-'), ' ' ORDER BY id) AS z, "
+                                   "count(*) AS n FROM invoice.service_entry_aenderung WHERE service_entry_id=:i AND von='test'", {"i": eid})
+            pruefe(r["n"] == 2 and r["z"] == "leistungsdatum:2026-01-05>2026-08-05 kommentar:Test A>-",
+                   f"Spur: genau 2 Zeilen (Datum, Kommentar geleert), keine fuer Wiederholung/409/422/404 -> {r['z']}")
         finally:
             await s.rollback()
     async with async_session_factory() as s:

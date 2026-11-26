@@ -201,12 +201,14 @@ async def anlegen(session: AsyncSession, stapel: Stapel, geraet_name: str) -> tu
             session,
             """
             INSERT INTO invoice.service_entries
-                   (customer_id, provider_id, service_id, leistungsdatum, menge, faktor, kommentar, status)
-            VALUES (:c, :p, :s, :d, :m, :f, :k, 'open')
+                   (customer_id, provider_id, service_id, leistungsdatum, menge, faktor, kommentar, status,
+                    angelegt_von)
+            VALUES (:c, :p, :s, :d, :m, :f, :k, 'open', :von)
             RETURNING id
             """,
             {"c": stapel.customer_id, "p": provider_id, "s": service_id[p.service_nummer],
-             "d": p.leistungsdatum, "m": _cent(p.menge), "f": _cent(p.faktor), "k": p.kommentar},
+             "d": p.leistungsdatum, "m": _cent(p.menge), "f": _cent(p.faktor), "k": p.kommentar,
+             "von": geraet_name},  # fA-2302 Punkt 3: welches Geraet hat die Zeile angelegt
         )
         neue_ids.append(int(row["id"]))
         ergebnisse.append({"index": i, "ergebnis": "angelegt", "id": int(row["id"])})
@@ -367,6 +369,14 @@ async def aendern(session: AsyncSession, entry_id: int, a: Aenderung, geraet_nam
     nachher_row = await fetch_one(
         session, "SELECT leistungsdatum, kommentar FROM invoice.service_entries WHERE id = :id", {"id": entry_id})
     nachher = {"leistungsdatum": nachher_row["leistungsdatum"].isoformat(), "kommentar": nachher_row["kommentar"]}
+    # fA-2302 Punkt 3: jede Aenderung als Zeile in der Spur (nur anhaengen), in derselben Transaktion
+    for feld in sorted(felder):
+        if ist[feld] != nachher[feld]:
+            await execute(session,
+                          "INSERT INTO invoice.service_entry_aenderung (service_entry_id, feld, vorher, nachher, von) "
+                          "VALUES (:id, :feld, :vorher, :nachher, :von)",
+                          {"id": entry_id, "feld": feld, "vorher": ist[feld], "nachher": nachher[feld],
+                           "von": geraet_name})
     logger.info("fA-2245 v2 Aenderung: geraet=%s id=%s kunde=%s felder=%s vorher=%s nachher=%s",
                 geraet_name, entry_id, a.customer_id, sorted(felder), ist, nachher)
     return 200, {"id": entry_id, "geaendert": True, "vorher": ist, "nachher": nachher, "geraet": geraet_name}
